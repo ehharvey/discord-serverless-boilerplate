@@ -2,7 +2,7 @@
  * The core server that runs on a Cloudflare worker.
  */
 
-import { Router } from 'itty-router';
+import { Request, Router } from 'itty-router';
 import {
   InteractionResponseType,
   InteractionType,
@@ -12,7 +12,7 @@ import { AWW_COMMAND, INVITE_COMMAND } from './commands.js';
 import { getCuteUrl } from './reddit.js';
 
 class JsonResponse extends Response {
-  constructor(body, init) {
+  constructor(body: { type?: number; data?: { content: any; } | { content: string; flags: number; }; error?: string; }, init: ResponseInit) {
     const jsonBody = JSON.stringify(body);
     init = init || {
       headers: {
@@ -46,7 +46,7 @@ router.post('/', async (request, env) => {
     console.log('Handling Ping request');
     return new JsonResponse({
       type: InteractionResponseType.PONG,
-    });
+    }, undefined);
   }
 
   if (message.type === InteractionType.APPLICATION_COMMAND) {
@@ -60,7 +60,7 @@ router.post('/', async (request, env) => {
           data: {
             content: cuteUrl,
           },
-        });
+        }, undefined);
       }
       case INVITE_COMMAND.name.toLowerCase(): {
         const applicationId = env.DISCORD_APPLICATION_ID;
@@ -71,7 +71,7 @@ router.post('/', async (request, env) => {
             content: INVITE_URL,
             flags: 64,
           },
-        });
+        }, undefined);
       }
       default:
         console.error('Unknown Command');
@@ -92,13 +92,13 @@ export default {
    * @param {*} env A map of key/value pairs with env vars and secrets from the cloudflare env.
    * @returns
    */
-  async fetch(request, env) {
+  async fetch(request: Request, env: { DISCORD_PUBLIC_KEY: string | ArrayBuffer | Uint8Array | Buffer; }) {
     if (request.method === 'POST') {
       // Using the incoming headers, verify this request actually came from discord.
-      const signature = request.headers.get('x-signature-ed25519');
-      const timestamp = request.headers.get('x-signature-timestamp');
+      const signature = request['headers'].get('x-signature-ed25519');
+      const timestamp = request['headers'].get('x-signature-timestamp');
       console.log(signature, timestamp, env.DISCORD_PUBLIC_KEY);
-      const body = await request.clone().arrayBuffer();
+      const body = await request.arrayBuffer();
       const isValidRequest = verifyKey(
         body,
         signature,
